@@ -96,7 +96,13 @@ public class FlowDSL {
         try {
             dslScript.run()
         } catch(JobExecutionFailureException e) {
+            listener.logger.println(e);
+            println(e);
             flowRun.state.result = FAILURE;
+        } catch(Exception e) {
+            listener.logger.println(e);
+            println(e);
+            throw e;
         }
     }
 
@@ -240,7 +246,14 @@ public class FlowDelegate {
         }
     }
 
-    def parallel(Closure ... closures) {
+    /* Executes the provided closures in parallel.
+     * parallel accepts a variable number of arguments. Each argument can be a closure or a collection of closures. EG:
+      * parallel( { build("foo") }, { build("bar") } )
+      * parallel( [ { build("foo" }, { build("bar") } ] )
+      * parallel( { build("foo" }, [ build("bar"), build("baz") ])
+     */
+    def parallel(Object... in_closures) {
+        def closures = in_closures.flatten()
         ExecutorService pool = Executors.newCachedThreadPool()
         Set<Run> upstream = flowRun.state.lastCompleted
         Set<Run> lastCompleted = Collections.synchronizedSet(new HashSet<Run>())
@@ -273,6 +286,7 @@ public class FlowDelegate {
                 } catch(ExecutionException e)
                 {
                     // TODO perhaps rethrow?
+                    println(e.toString())
                     current_state.result = FAILURE
                 }
             }

@@ -100,4 +100,28 @@ class ParallelTest extends DSLTestCase {
         println flow.builds.edgeSet()
     }
 
+    public void testAcceptsList() {
+        def jobs = createJobs(["job1", "job2", "job3"])
+        def flow = run("""
+            def v = [{ build("job1") },
+                      { build("job2") },
+                      { build("job3") }]
+            parallel(v)
+        """)
+        assertAllSuccess(jobs)
+        assert SUCCESS == flow.result
+        println flow.builds.edgeSet()
+    }
+
+    public void testAcceptsMixClosuresAndLists() {
+        def jobs = createJobs(["job1", "job2", "job3"])
+        def flow = run("""
+            def v = [{ build("job1") },
+                      { build("job2") }]
+            parallel(v, { build("job3") })
+        """)
+        assertAllSuccess(jobs)
+        assert SUCCESS == flow.result
+        println flow.builds.edgeSet()
+    }
 }
