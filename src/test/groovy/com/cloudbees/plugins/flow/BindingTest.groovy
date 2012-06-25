@@ -24,6 +24,8 @@ import jenkins.model.Jenkins
 import org.junit.Ignore
 import hudson.slaves.EnvironmentVariablesNodeProperty
 import hudson.slaves.EnvironmentVariablesNodeProperty.Entry
+import hudson.model.ParametersDefinitionProperty
+import hudson.model.StringParameterDefinition
 
 class BindingTest extends DSLTestCase {
 
@@ -53,4 +55,17 @@ class BindingTest extends DSLTestCase {
         assert SUCCESS == flow.result
     }
 
+    public void testNoBindingsMeansDefaults() {
+        def job1 = createJob("job1")
+        def param1 = new StringParameterDefinition("param1", "expectDefaultValue", "")
+        ParametersDefinitionProperty param_defs = new ParametersDefinitionProperty(param1)
+        job1.addProperty(param_defs)
+
+        def flow = run("""
+            build("job1")
+        """)
+        def build = assertSuccess(job1);
+        assertHasParameter( build, "param1", "expectDefaultValue")
+        assert SUCCESS == flow.result
+    }
 }
