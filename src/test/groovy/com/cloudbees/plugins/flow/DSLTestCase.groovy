@@ -119,7 +119,7 @@ abstract class DSLTestCase extends HudsonTestCase {
                     return
                 }
         }
-        assertTrue("build don't have expected parameter set " + name + "=" + value, found)
+        assertTrue("build does not have expected parameter set " + name + "=" + value, found)
     }
 
     void assertRan(Job job, int times, Result result) {
