@@ -150,7 +150,7 @@ public class FlowDelegate {
     }
     /* Additional parameters overload defaults with the same name.
      */
-    def build(Map args, String jobName) {
+    def build(Map in_args, String jobName) {
         if (flowRun.state.result.isWorseThan(SUCCESS)) {
             println("Skipping ${jobName}")
             fail()
@@ -160,7 +160,13 @@ public class FlowDelegate {
 
         def p = job.getProject()
         println("Trigger job " + HyperlinkNote.encodeTo('/'+ p.getUrl(), p.getFullDisplayName()))
-        Run r = flowRun.run(job, getActions(args));
+
+        // Start with the default arguments then add all the arguments provided to build.
+        // This means that parameters provided to build will override default parameters.
+        def args = defaultParams(p)
+        args.putAll(in_args)
+
+        Run r = flowRun.run(job, actionsForArgs(args))
 
         if (null == r) {
             println("Failed to start ${jobName}.")
@@ -171,15 +177,35 @@ public class FlowDelegate {
         return job;
     }
 
-    def getActions(Map args) {
-        // Do not create an empty ParametersAction. The expectation with no args is for the default params to be used.
-        // With an empty ParametersAction the defaults are not used.
-        if(0 == args.size()) {
-            return new ArrayList<Action>();
+    def defaultParams(AbstractProject project) {
+        Map out = new HashMap()
+
+        // There is a private method of project called getDefaultParameters that could greatly simplify all this.
+        ParametersDefinitionProperty projectParams = project.getProperty(ParametersDefinitionProperty.class)
+        if(null == projectParams)
+            return out
+
+        for(ParameterDefinition parameterDefinition : projectParams.getParameterDefinitions()) {
+            ParameterValue defaultValue = parameterDefinition.getDefaultParameterValue()
+            if(null == defaultValue)
+                continue
+
+            if (defaultValue instanceof BooleanParameterValue) {
+                out.put(parameterDefinition.getName(), ((BooleanParameterValue)defaultValue).value)
+            }
+            if (defaultValue instanceof  StringParameterValue) {
+                out.put(parameterDefinition.getName(), ((StringParameterValue)defaultValue).value)
+            }
         }
 
+        return out
+    }
+
+    def actionsForArgs(Map args) {
         List<Action> actions = new ArrayList<Action>();
+
         List<ParameterValue> params = [];
+
         for (Map.Entry param: args) {
             String paramName = param.key
             Object paramValue = param.value
@@ -272,7 +298,6 @@ public class FlowDelegate {
 
         def current_state = flowRun.state
         try {
-
             closures.each {closure ->
                 Closure<FlowState> track_closure = {
                     flowRun.state = new FlowState(SUCCESS, upstream)
