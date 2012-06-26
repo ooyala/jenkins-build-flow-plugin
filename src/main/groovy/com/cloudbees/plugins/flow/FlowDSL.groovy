@@ -148,7 +148,8 @@ public class FlowDelegate {
     def build(String jobName) {
         build([:], jobName)
     }
-    
+    /* Additional parameters overload defaults with the same name.
+     */
     def build(Map args, String jobName) {
         if (flowRun.state.result.isWorseThan(SUCCESS)) {
             println("Skipping ${jobName}")

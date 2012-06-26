@@ -68,4 +68,35 @@ class BindingTest extends DSLTestCase {
         assertHasParameter( build, "param1", "expectDefaultValue")
         assert SUCCESS == flow.result
     }
+
+    public void testDefaultsWithAddedBindings() {
+        def job1 = createJob("job1")
+        def param1 = new StringParameterDefinition("param1", "expectDefaultValue", "")
+        ParametersDefinitionProperty param_defs = new ParametersDefinitionProperty(param1)
+        job1.addProperty(param_defs)
+
+        def flow = run("""
+            build("job1", param2: "param2")
+        """)
+        def build = assertSuccess(job1);
+        assertHasParameter( build, "param1", "expectDefaultValue")
+        assertHasParameter( build, "param2", "param2")
+        assert SUCCESS == flow.result
+    }
+
+    public void testOverloadedDefaults() {
+        def job1 = createJob("job1")
+        def param1 = new StringParameterDefinition("param1", "default value", "")
+        def param2 = new StringParameterDefinition("param2", "default value", "")
+        ParametersDefinitionProperty param_defs = new ParametersDefinitionProperty(param1, param2)
+        job1.addProperty(param_defs)
+
+        def flow = run("""
+            build("job1", param2: "not default value")
+        """)
+        def build = assertSuccess(job1);
+        assertHasParameter( build, "param1", "default value")
+        assertHasParameter( build, "param2", "not default value")
+        assert SUCCESS == flow.result
+    }
 }
