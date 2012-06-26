@@ -106,4 +106,16 @@ class BuildTest extends DSLTestCase {
         assertHasParameter(build, "param2", "job1")
         assert SUCCESS == flow.result
     }
+
+    public void testBuildOn() {
+        createSlave("node0", "foo bar", null)
+        createSlave("node1", "bar baz", null)
+        Job job1 = createJob("job1")
+        def flow = run("""
+            buildOn("node1", "job1")
+        """)
+        def build = assertSuccess(job1)
+        assert build.builtOn == "node1"
+        assert SUCCESS == flow.result
+    }
 }
