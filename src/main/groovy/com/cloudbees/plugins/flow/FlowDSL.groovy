@@ -171,6 +171,12 @@ public class FlowDelegate {
     }
 
     def getActions(Map args) {
+        // Do not create an empty ParametersAction. The expectation with no args is for the default params to be used.
+        // With an empty ParametersAction the defaults are not used.
+        if(0 == args.size()) {
+            return new ArrayList<Action>();
+        }
+
         List<Action> actions = new ArrayList<Action>();
         List<ParameterValue> params = [];
         for (Map.Entry param: args) {
