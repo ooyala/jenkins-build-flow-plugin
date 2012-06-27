@@ -35,6 +35,7 @@ import java.util.concurrent.Callable
 
 import static hudson.model.Result.FAILURE
 import java.util.concurrent.ExecutionException
+import hudson.model.queue.SubTask
 
 public class FlowDSL {
 
@@ -109,6 +110,25 @@ public class FlowDSL {
     // TODO define a parseFlowScript to validate flow DSL and maintain jobs dependencygraph
 }
 
+private class UseLabelParam extends ParameterValue {
+    private Label label;
+
+    public UseLabelParam(String labelExpression) {
+        super("UseNodeLabel")
+        label = Label.parseExpression(labelExpression)
+    }
+
+    public UseLabelParam(Label label) {
+        super("UseNodeLabel")
+        this.label = label
+    }
+
+    @Override
+    public Label getAssignedLabel(SubTask task) {
+        return this.label
+    }
+}
+
 public class FlowDelegate {
 
     private static final Logger LOGGER = Logger.getLogger(FlowDelegate.class.getName());
@@ -148,6 +168,11 @@ public class FlowDelegate {
     def build(String jobName) {
         build([:], jobName)
     }
+
+    def buildOn(String labelExpr, String jobName) {
+        buildOn([:], labelExpr, jobName)
+    }
+
     /* Additional parameters overload defaults with the same name.
      */
     def build(Map in_args, String jobName) {
@@ -175,6 +200,11 @@ public class FlowDelegate {
 
         println(HyperlinkNote.encodeTo('/'+ r.getUrl(), r.getFullDisplayName())+" completed")
         return job;
+    }
+
+    def buildOn(Map in_args, String labelExpr, String jobName) {
+        in_args.put("", new UseLabelParam(labelExpr))
+        build(in_args, jobName)
     }
 
     def defaultParams(AbstractProject project) {
@@ -214,6 +244,9 @@ public class FlowDelegate {
             }
             if (paramValue instanceof Boolean) {
                 params.add(new BooleanParameterValue(paramName, (Boolean) paramValue))
+            }
+            if (paramValue instanceof UseLabelParam) {
+                params.add((UseLabelParam) paramValue)
             }
             else {
                 params.add(new StringParameterValue(paramName, paramValue.toString()))
