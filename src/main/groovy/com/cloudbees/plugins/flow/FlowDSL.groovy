@@ -110,22 +110,27 @@ public class FlowDSL {
     // TODO define a parseFlowScript to validate flow DSL and maintain jobs dependencygraph
 }
 
-private class UseLabelParam extends ParameterValue {
-    private Label label;
+public class NodeConstraintParam extends ParameterValue {
+    public Label value;
 
-    public UseLabelParam(String labelExpression) {
+    public NodeConstraintParam(String labelExpression) {
         super("UseNodeLabel")
-        label = Label.parseExpression(labelExpression)
+        value = Label.parseExpression(labelExpression)
     }
 
-    public UseLabelParam(Label label) {
+    public NodeConstraintParam(Label label) {
         super("UseNodeLabel")
-        this.label = label
+        this.value = label
     }
 
     @Override
     public Label getAssignedLabel(SubTask task) {
-        return this.label
+        return this.value
+    }
+
+    @Override
+    public String toString() {
+        return "Node Constraint: " + value.toString()
     }
 }
 
@@ -203,7 +208,7 @@ public class FlowDelegate {
     }
 
     def buildOn(Map in_args, String labelExpr, String jobName) {
-        in_args.put("", new UseLabelParam(labelExpr))
+        in_args.put("", new NodeConstraintParam(labelExpr))
         build(in_args, jobName)
     }
 
@@ -245,8 +250,8 @@ public class FlowDelegate {
             if (paramValue instanceof Boolean) {
                 params.add(new BooleanParameterValue(paramName, (Boolean) paramValue))
             }
-            if (paramValue instanceof UseLabelParam) {
-                params.add((UseLabelParam) paramValue)
+            if (paramValue instanceof NodeConstraintParam) {
+                params.add((NodeConstraintParam) paramValue)
             }
             else {
                 params.add(new StringParameterValue(paramName, paramValue.toString()))
