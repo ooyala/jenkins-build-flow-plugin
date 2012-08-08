@@ -36,6 +36,7 @@ import java.util.concurrent.Callable
 import static hudson.model.Result.FAILURE
 import java.util.concurrent.ExecutionException
 import hudson.model.queue.SubTask
+import com.thoughtworks.xstream.converters.collections.CollectionConverter
 
 public class FlowDSL {
 
@@ -315,6 +316,10 @@ public class FlowDelegate {
 
             println("} // failed")
         }
+    }
+
+    def parallel(Collection<? extends Closure> closures) {
+        parallel(closures as Closure[])
     }
 
     /* Executes the provided closures in parallel.

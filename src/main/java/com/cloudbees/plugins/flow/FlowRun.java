@@ -67,13 +67,14 @@ public class FlowRun extends AbstractBuild<BuildFlow, FlowRun>{
 
     /* package */ Run run(JobInvocation job, List<Action> actions) throws ExecutionException, InterruptedException {
         Boolean could_run = job.run(new FlowCause(this),actions);
-        if(could_run) {
-            addBuild(job.getBuild());
-            getState().setResult(job.getResult());
-            return job.getBuild();
-        } else {
-            return null;
-        }
+
+        if(!could_run)
+            throw new CouldNotScheduleJobException("Could not schedule job " 
+                    + job.getProject().getName() +", ensure its not already enqueued with same parameters", e);
+
+        addBuild(job.getBuild());
+        getState().setResult(job.getResult());
+        return job.getBuild();
     }
 
     /* package */ FlowState getState() {
