@@ -15,6 +15,10 @@ public class FlowCause extends Cause {
 
     @Override
     public String getShortDescription() {
-        return "Started by build flow " + flowRun.toString();
+        if(null == flowRun) {
+            return "Started by unknown build flow";
+        } else {
+            return "Started by build flow " + flowRun.toString();
+        }
     }
 }
