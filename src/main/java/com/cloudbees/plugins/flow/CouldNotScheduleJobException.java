@@ -16,4 +16,8 @@ class CouldNotScheduleJobException extends RuntimeException {
     public CouldNotScheduleJobException(String message, Exception e) {
             super(message, e);
     }
+    
+    public CouldNotScheduleJobException(String message) {
+            super(message);
+    }
 }
