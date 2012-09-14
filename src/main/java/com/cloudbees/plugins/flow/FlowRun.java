@@ -65,6 +65,13 @@ public class FlowRun extends AbstractBuild<BuildFlow, FlowRun>{
         state.set(new FlowState(SUCCESS, this));
     }
 
+    public FlowRun(Immunity job) throws IOException {
+        super(job);
+        this.dsl = job.getDsl();
+        builds.addVertex(this); // Initial vertex for the build DAG
+        state.set(new FlowState(SUCCESS, this));
+    }
+
     /* package */ Run run(JobInvocation job, List<Action> actions) throws ExecutionException, InterruptedException {
         Boolean could_run = job.run(new FlowCause(this),actions);
 

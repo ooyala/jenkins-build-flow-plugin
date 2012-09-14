@@ -18,28 +18,14 @@
 package com.cloudbees.plugins.flow;
 
 import hudson.Extension;
-import hudson.model.*;
-import hudson.model.Descriptor.FormException;
-import hudson.model.Queue.FlyweightTask;
-import hudson.tasks.BuildStep;
-import hudson.tasks.BuildStepDescriptor;
-import hudson.tasks.Fingerprinter;
-import hudson.tasks.Publisher;
-import hudson.Util;
-import hudson.util.AlternativeUiTextProvider;
-import hudson.util.DescribableList;
+import hudson.model.ItemGroup;
+import hudson.model.TopLevelItem;
+import hudson.model.AbstractProject;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.HashSet;
-import javax.servlet.ServletException;
+import hudson.tasks.Fingerprinter;
+import java.util.logging.Logger;
 
 import net.sf.json.JSONObject;
-
-import org.kohsuke.stapler.StaplerRequest;
-import org.kohsuke.stapler.StaplerResponse;
 
 /**
  * Defines the orchestration logic for a build flow as a succession o jobs to be executed and chained together
@@ -52,24 +38,40 @@ public class Immunity extends BuildFlow{
         super(parent, name);
     }
 
+    private static final Logger LOGGER = Logger.getLogger(Immunity.class.getName());
+
+    private final String immunityGroovy = "// using the defaults for the other commands\n" +
+            "deploy_run = buildOn(\"c3-jenkins6\", \"generic_deploy\", MAIN_REPO: ${MAIN_REPO}, " +
+            "DEPLOY_COMMAND: @DEPLOY_COMMAND, REGION: @REGION, DEPENDENT_REPO: @DEPENDENT_REPO\n" +
+            "out.println(\"deploy run result: ${deploy_run.result}\")\n" +
+            "tests_run = buildOn(\"c3-jenkins6\", \"generic_tests\", MAIN_REPO: @MAIN_REPO, " +
+            "TESTS_COMMAND: @TEST_COMMAND, REGION: @REGION, DEPENDENT_REPO: @DEPENDENT_REPO\n" +
+            "out.println(\"tests run result: ${tests_run.result}\")";
+
     @Extension
     public static final ImmunityDescriptor DESCRIPTOR = new ImmunityDescriptor();
 
     @Override
-    public BuildFlowDescriptor getDescriptor() {
+    public ImmunityDescriptor getDescriptor() {
         return DESCRIPTOR;
     }
 
-    @Override
-    public String getDsl() {
-//        Chance this to have the groovy script I wrote with the appropriate changes
-        return super.getDsl();
-    }
 
     @Override
-    public void setDsl(String dsl) {
-        super.setDsl(dsl);
+    public String getDsl() {
+        String dsl = super.getDsl();
+        if (dsl == null)
+            return null;
+        // Removing the quotes around the string. not sure why there are quotes here to begin with.
+        dsl = dsl.substring(1,dsl.length() - 1);
+
+        JSONObject json = JSONObject.fromObject(dsl);
+        for (Object key: json.keySet()) {
+            dsl = immunityGroovy.replaceAll("@" + key.toString().toUpperCase(), json.get(key).toString());
+        }
+        return dsl;
     }
+
 
     public static class ImmunityDescriptor extends BuildFlowDescriptor {
         @Override
