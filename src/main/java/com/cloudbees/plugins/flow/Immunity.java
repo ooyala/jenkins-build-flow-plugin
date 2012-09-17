@@ -23,6 +23,10 @@ import hudson.model.TopLevelItem;
 import hudson.model.AbstractProject;
 
 import hudson.tasks.Fingerprinter;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.logging.Logger;
 
 import net.sf.json.JSONObject;
@@ -40,14 +44,6 @@ public class Immunity extends BuildFlow{
 
     private static final Logger LOGGER = Logger.getLogger(Immunity.class.getName());
 
-    private final String immunityGroovy = "// using the defaults for the other commands\n" +
-            "deploy_run = buildOn(\"c3-jenkins6\", \"generic_deploy\", MAIN_REPO: ${MAIN_REPO}, " +
-            "DEPLOY_COMMAND: @DEPLOY_COMMAND, REGION: @REGION, DEPENDENT_REPO: @DEPENDENT_REPO\n" +
-            "out.println(\"deploy run result: ${deploy_run.result}\")\n" +
-            "tests_run = buildOn(\"c3-jenkins6\", \"generic_tests\", MAIN_REPO: @MAIN_REPO, " +
-            "TESTS_COMMAND: @TEST_COMMAND, REGION: @REGION, DEPENDENT_REPO: @DEPENDENT_REPO\n" +
-            "out.println(\"tests run result: ${tests_run.result}\")";
-
     @Extension
     public static final ImmunityDescriptor DESCRIPTOR = new ImmunityDescriptor();
 
@@ -56,22 +52,54 @@ public class Immunity extends BuildFlow{
         return DESCRIPTOR;
     }
 
+    public String runShellCommand(String command) {
+        Runtime run = Runtime.getRuntime();
+        String output = "";
+        try {
+            Process pr = run.exec(command);
+            int exitValue = pr.waitFor();
+            if (exitValue != 0)
+                LOGGER.severe("Invalid command, " + command + " exited with value " + exitValue);
+            BufferedReader buf = new BufferedReader( new InputStreamReader( pr.getInputStream() ) ) ;
+            String line;
+            while ((line = buf.readLine()) != null)
+                output += line + "\n";
+        } catch (IOException e) {
+            LOGGER.severe("failed to run shell command");
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            LOGGER.severe("failed to run shell command due to interrupt");
+            e.printStackTrace();
+        }
+        return output;
+    }
+
+    private String getImmunityGroovyScript() {
+        runShellCommand("rm -rf temp");
+        runShellCommand("git clone ssh://git@git.corp.ooyala.com/jenkins-configs.git temp/jenkins-configs");
+        return runShellCommand("cat temp/jenkins-configs/immunity.groovy");
+    }
+
 
     @Override
     public String getDsl() {
-        String dsl = super.getDsl();
-        if (dsl == null)
-            return null;
+        String immunityHash = super.getDsl();
+        if (immunityHash == null || immunityHash.length() == 0)
+            return immunityHash;
         // Removing the quotes around the string. not sure why there are quotes here to begin with.
-        dsl = dsl.substring(1,dsl.length() - 1);
+        immunityHash = immunityHash.substring(1, immunityHash.length() - 1);
 
-        JSONObject json = JSONObject.fromObject(dsl);
+        String immunityGroovy = getImmunityGroovyScript();
+
+        LOGGER.info("immunity groovy without substitution: " + immunityGroovy);
+        JSONObject json = JSONObject.fromObject(immunityHash);
         for (Object key: json.keySet()) {
-            dsl = immunityGroovy.replaceAll("@" + key.toString().toUpperCase(), json.get(key).toString());
+            immunityGroovy = immunityGroovy.replaceAll("@" + key.toString().toUpperCase(),
+                    "'" + json.get(key).toString() + "'");
         }
-        return dsl;
+        LOGGER.info("immunity groovy with substitution: " + immunityGroovy);
+        return immunityGroovy;
     }
-
 
     public static class ImmunityDescriptor extends BuildFlowDescriptor {
         @Override
