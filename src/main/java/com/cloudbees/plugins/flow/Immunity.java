@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.logging.Logger;
 
+import net.sf.json.JSONException;
 import net.sf.json.JSONObject;
 
 /**
@@ -90,12 +91,16 @@ public class Immunity extends BuildFlow{
         String immunityGroovy = getImmunityGroovyScript();
 
         LOGGER.info("immunity groovy without substitution: " + immunityGroovy);
-        JSONObject json = JSONObject.fromObject(immunityHash);
-        for (Object key: json.keySet()) {
-            immunityGroovy = immunityGroovy.replaceAll("@" + key.toString().toUpperCase(),
-                    "'" + json.get(key).toString() + "'");
+        try {
+            JSONObject json = JSONObject.fromObject(immunityHash);
+            for (Object key: json.keySet()) {
+                immunityGroovy = immunityGroovy.replaceAll("@" + key.toString().toUpperCase(),
+                        "'" + json.get(key).toString() + "'");
+            }
+            LOGGER.info("immunity groovy with substitution: " + immunityGroovy);
+        } catch (JSONException e) {
+            LOGGER.severe("The hash received was an invalid one. " + immunityHash);
         }
-        LOGGER.info("immunity groovy with substitution: " + immunityGroovy);
         return immunityGroovy;
     }
 
