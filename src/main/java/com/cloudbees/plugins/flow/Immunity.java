@@ -20,9 +20,6 @@ package com.cloudbees.plugins.flow;
 import hudson.Extension;
 import hudson.model.ItemGroup;
 import hudson.model.TopLevelItem;
-import hudson.model.AbstractProject;
-
-import hudson.tasks.Fingerprinter;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -32,9 +29,10 @@ import java.util.logging.Logger;
 import net.sf.json.JSONObject;
 
 /**
- * Defines the orchestration logic for a build flow as a succession o jobs to be executed and chained together
+ * Defines the logic for the immunity job, which is basically a BuildFlow job with a predefined groovy
+ * script.
  *
- * @author <a href="mailto:nicolas.deloof@cloudbees.com">Nicolas De loof</a>
+ * @author Noam Szpiro
  */
 public class Immunity extends BuildFlow{
 

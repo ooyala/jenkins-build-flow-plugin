@@ -1,3 +1,12 @@
 <div>
-  Help I need somebody
+  An immunity hash should be inserted to the textarea above.
+  For example the hash for pensieve would look like this:
+    {
+    'MAIN_REPO':'usa',
+    'DEPLOY_COMMAND':'cd pensieve && bundle install && fez {{region}} deploy_without_tests_without_confirm',
+    'REGION':'staging',
+    'TEST_COMMAND':'cd pensieve && bundle install && fez {{region}} remote_tests',
+    'DEPENDENT_REPO':'backlot'
+    }
+
 </div>
