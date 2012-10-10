@@ -51,32 +51,33 @@ public class Immunity extends BuildFlow{
         return DESCRIPTOR;
     }
 
-    public String runShellCommand(String command) {
+    public String runShellCommand(String command) throws IOException, InterruptedException{
         Runtime run = Runtime.getRuntime();
         String output = "";
-        try {
-            Process pr = run.exec(command);
-            int exitValue = pr.waitFor();
-            if (exitValue != 0)
-                LOGGER.severe("Invalid command, " + command + " exited with value " + exitValue);
-            BufferedReader buf = new BufferedReader( new InputStreamReader( pr.getInputStream() ) ) ;
-            String line;
-            while ((line = buf.readLine()) != null)
-                output += line + "\n";
-        } catch (IOException e) {
-            LOGGER.severe("failed to run shell command");
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            LOGGER.severe("failed to run shell command due to interrupt");
-            e.printStackTrace();
-        }
+        Process pr = run.exec(command);
+        int exitValue = pr.waitFor();
+        if (exitValue != 0)
+            LOGGER.severe("Invalid command, " + command + " exited with value " + exitValue);
+        BufferedReader buf = new BufferedReader( new InputStreamReader( pr.getInputStream() ) ) ;
+        String line;
+        while ((line = buf.readLine()) != null)
+            output += line + "\n";
         return output;
     }
 
     private String getImmunityGroovyScript() {
-        runShellCommand("rm -rf temp");
-        runShellCommand("git clone ssh://git@git.corp.ooyala.com/jenkins-configs.git temp/jenkins-configs");
-        return runShellCommand("cat temp/jenkins-configs/immunity.groovy");
+        try {
+          runShellCommand("rm -rf temp");
+          runShellCommand("/usr/bin/git clone ssh://git@git.corp.ooyala.com/jenkins-configs.git temp/jenkins-configs");
+          return runShellCommand("cat temp/jenkins-configs/immunity.groovy");
+        } catch (IOException e) {
+          LOGGER.severe("failed to run shell command");
+          e.printStackTrace();
+        } catch (InterruptedException e) {
+          LOGGER.severe("failed to run shell command due to interrupt");
+          e.printStackTrace();
+        }
+        return "";
     }
 
 
