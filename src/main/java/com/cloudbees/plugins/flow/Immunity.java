@@ -65,24 +65,15 @@ public class Immunity extends BuildFlow{
         return output;
     }
 
-    private String getImmunityGroovyScript() {
-        try {
-          runShellCommand("rm -rf temp");
-          runShellCommand("/usr/bin/git clone ssh://git@git.corp.ooyala.com/jenkins-configs.git temp/jenkins-configs");
-          return runShellCommand("cat temp/jenkins-configs/immunity.groovy");
-        } catch (IOException e) {
-          LOGGER.severe("failed to run shell command");
-          e.printStackTrace();
-        } catch (InterruptedException e) {
-          LOGGER.severe("failed to run shell command due to interrupt");
-          e.printStackTrace();
-        }
-        return "";
+    private String getImmunityGroovyScript() throws IOException, InterruptedException {
+        runShellCommand("rm -rf /tmp/jenkins-configs");
+        runShellCommand("/usr/bin/git clone ssh://git@git.corp.ooyala.com/jenkins-configs.git /tmp/jenkins-configs");
+        return runShellCommand("cat /tmp/jenkins-configs/immunity.groovy");
     }
 
 
     @Override
-    public String getDsl() {
+    public String getDsl() throws IOException, InterruptedException {
         String immunityHash = super.getDsl();
         if (immunityHash == null || immunityHash.length() == 0)
             return immunityHash;

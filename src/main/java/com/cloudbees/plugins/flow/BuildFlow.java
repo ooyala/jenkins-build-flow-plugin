@@ -59,7 +59,7 @@ public class BuildFlow extends AbstractProject<BuildFlow, FlowRun> implements To
         super(parent, name);
     }
 
-    public String getDsl() {
+    public String getDsl() throws IOException, InterruptedException {
         return dsl;
     }
 
