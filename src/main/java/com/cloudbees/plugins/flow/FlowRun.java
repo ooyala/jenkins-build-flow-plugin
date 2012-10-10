@@ -65,8 +65,8 @@ public class FlowRun extends AbstractBuild<BuildFlow, FlowRun>{
         state.set(new FlowState(SUCCESS, this));
     }
 
-    public FlowRun(Immunity job) throws IOException {
-        super(job);
+    public FlowRun(Immunity job, File buildDir) throws IOException {
+        super(job, buildDir);
         this.dsl = job.getDsl();
         builds.addVertex(this); // Initial vertex for the build DAG
         state.set(new FlowState(SUCCESS, this));
