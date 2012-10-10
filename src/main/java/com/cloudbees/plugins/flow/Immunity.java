@@ -100,6 +100,7 @@ public class Immunity extends BuildFlow{
             LOGGER.info("immunity groovy with substitution: " + immunityGroovy);
         } catch (JSONException e) {
             LOGGER.severe("The hash received was an invalid one. " + immunityHash);
+            return super.getDsl();
         }
         return immunityGroovy;
     }
