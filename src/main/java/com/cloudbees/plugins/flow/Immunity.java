@@ -35,7 +35,7 @@ import net.sf.json.JSONObject;
  *
  * @author Noam Szpiro
  */
-public class Immunity extends BuildFlow{
+public class Immunity extends BuildFlow {
 
     public Immunity(ItemGroup parent, String name) {
         super(parent, name);
@@ -73,28 +73,38 @@ public class Immunity extends BuildFlow{
 
 
     @Override
-    public String getDsl() throws IOException, InterruptedException {
+    /** TODO(corey): this should not override getDsl.
+     */
+    public String getDsl() throws IOException {
         String immunityHash = super.getDsl();
         if (immunityHash == null || immunityHash.length() == 0)
             return immunityHash;
-        // Removing the quotes around the string. not sure why there are quotes here to begin with.
-        immunityHash = immunityHash.substring(1, immunityHash.length() - 1);
 
-        String immunityGroovy = getImmunityGroovyScript();
-
-        LOGGER.info("immunity groovy without substitution: " + immunityGroovy);
         try {
-            JSONObject json = JSONObject.fromObject(immunityHash);
-            for (Object key: json.keySet()) {
-                immunityGroovy = immunityGroovy.replaceAll("@" + key.toString().toUpperCase(),
-                        "'" + json.get(key).toString() + "'");
+            // Removing the quotes around the string. not sure why there are quotes here to begin with.
+            immunityHash = immunityHash.substring(1, immunityHash.length() - 1);
+
+            String immunityGroovy = getImmunityGroovyScript();
+
+            LOGGER.info("immunity groovy without substitution: " + immunityGroovy);
+            try {
+                JSONObject json = JSONObject.fromObject(immunityHash);
+                for (Object key: json.keySet()) {
+                    immunityGroovy = immunityGroovy.replaceAll("@" + key.toString().toUpperCase(),
+                            "'" + json.get(key).toString() + "'");
+                }
+                LOGGER.info("immunity groovy with substitution: " + immunityGroovy);
+            } catch (JSONException e) {
+                LOGGER.severe("The hash received was an invalid one. " + immunityHash);
+                return super.getDsl();
             }
-            LOGGER.info("immunity groovy with substitution: " + immunityGroovy);
-        } catch (JSONException e) {
-            LOGGER.severe("The hash received was an invalid one. " + immunityHash);
-            return super.getDsl();
+            return immunityGroovy;
+        } catch(InterruptedException e)
+        {
+            // TODO(corey): because this function is called from a constructor. Which is a
+            // constructor called by jenkins we have to stick with IOExceptions only. AFAIK anyways.
+            throw new IOException(e.toString());
         }
-        return immunityGroovy;
     }
 
     public static class ImmunityDescriptor extends BuildFlowDescriptor {
