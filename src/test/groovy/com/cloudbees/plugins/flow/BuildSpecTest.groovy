@@ -12,7 +12,6 @@ class BuildSpecTest extends DSLTestCase {
         Job job1 = createJob("job1")
         def flow = run("""
             spec = new BuildSpec("job1")
-            spec.build
 """)
         def build = assertSuccess(job1)
         assert SUCCESS == flow.result

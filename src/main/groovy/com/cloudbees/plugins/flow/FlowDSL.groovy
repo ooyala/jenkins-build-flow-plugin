@@ -82,20 +82,21 @@ public class FlowDSL {
                 NOT_BUILT: Result.NOT_BUILT
         ])
 
-        Script dslScript = new GroovyShell(binding).parse("flow { " + dsl + "}")
-        dslScript.metaClass = createEMC(dslScript.class, {
-            ExpandoMetaClass emc ->
-            emc.flow = {
-                Closure cl ->
-                cl.delegate = flow
-                cl.resolveStrategy = Closure.DELEGATE_FIRST
-                cl()
-            }
-            emc.println = {
-                String s -> flow.println s
-            }
-        })
         try {
+            Script dslScript = new GroovyShell(this.class.classLoader, binding).parse("flow { " + dsl + "}")
+            dslScript.metaClass = createEMC(dslScript.class, {
+                ExpandoMetaClass emc ->
+                    emc.flow = {
+                        Closure cl ->
+                            cl.delegate = flow
+                            cl.resolveStrategy = Closure.DELEGATE_FIRST
+                            cl()
+                    }
+                    emc.println = {
+                        String s -> flow.println s
+                    }
+            })
+
             dslScript.run()
         } catch(JobExecutionFailureException e) {
             listener.logger.println(e);
@@ -132,6 +133,11 @@ public class NodeConstraintParam extends ParameterValue {
     @Override
     public String toString() {
         return "Node Constraint: " + value.toString()
+    }
+}
+
+public class BuildSpec {
+    public BuildSpec(String jobName) {
     }
 }
 
