@@ -1,18 +1,25 @@
 /*
- * Copyright (C) 2011 CloudBees Inc.
+ * The MIT License
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * as published by the Free Software Foundation; either version 3
- * of the License, or (at your option) any later version.
+ * Copyright (c) 2013, CloudBees, Inc., Nicolas De Loof.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * You should have received a copy of the GNU Lesser General Public
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 package com.cloudbees.plugins.flow;
@@ -28,32 +35,35 @@ import hudson.tasks.Publisher;
 import hudson.Util;
 import hudson.util.AlternativeUiTextProvider;
 import hudson.util.DescribableList;
+import hudson.util.FormValidation;
+import jenkins.model.Jenkins;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
+
 import javax.servlet.ServletException;
 
 import net.sf.json.JSONObject;
 
+import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
+import org.codehaus.groovy.control.MultipleCompilationErrorsException;
+import groovy.lang.GroovyShell;
 
 /**
- * Defines the orchestration logic for a build flow as a succession o jobs to be executed and chained together
+ * Defines the orchestration logic for a build flow as a succession of jobs to be executed and chained together
  *
  * @author <a href="mailto:nicolas.deloof@cloudbees.com">Nicolas De loof</a>
  */
-public class BuildFlow extends AbstractProject<BuildFlow, FlowRun> implements TopLevelItem, FlyweightTask, Saveable, SCMedItem {
+public class BuildFlow extends Project<BuildFlow, FlowRun> implements TopLevelItem, FlyweightTask, SCMedItem {
 
     private final FlowIcon icon = new FlowIcon();
 
     private String dsl;
-
-    private DescribableList<Publisher, Descriptor<Publisher>> publishers = 
-        new DescribableList<Publisher, Descriptor<Publisher>>(this);
 
     public BuildFlow(ItemGroup parent, String name) {
         super(parent, name);
@@ -68,27 +78,12 @@ public class BuildFlow extends AbstractProject<BuildFlow, FlowRun> implements To
     }
 
     @Override
-    public DescribableList<Publisher, Descriptor<Publisher>> getPublishersList() {
-        return publishers;
-    }
-
-    /**
-     * Returns the list of publishers. This method is used to initialize the config-publishers view with the data
-     * stored in the publishers data member. Without this method defined the config-publishers view is always
-     * initialized to defaults.
-     */
-    public Map<Descriptor<Publisher>,Publisher> getPublishers() {
-        return publishers.toMap();
-    }
-
-    @Override
     protected void submit(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException, FormException {
         super.submit(req, rsp);
-
         JSONObject json = req.getSubmittedForm();
-
-        this.dsl = json.getString("dsl");
-        publishers.rebuild(req, json, BuildStepDescriptor.filter(Publisher.all(), this.getClass()));
+        if (Jenkins.getInstance().hasPermission(Jenkins.RUN_SCRIPTS)) { 
+            this.dsl = json.getString("dsl");
+        }
     }
 
     @Extension
@@ -98,16 +93,13 @@ public class BuildFlow extends AbstractProject<BuildFlow, FlowRun> implements To
         return DESCRIPTOR;
     }
 
-    public void onCompleted(Run run) {
-    }
-
     @Override
     public String getPronoun() {
         return AlternativeUiTextProvider.get(PRONOUN, this, Messages.BuildFlow_Messages());
     }
 
 
-    public static class BuildFlowDescriptor extends TopLevelItemDescriptor {
+    public static class BuildFlowDescriptor extends AbstractProjectDescriptor {
         @Override
         public String getDisplayName() {
             return Messages.BuildFlow_Messages();
@@ -117,6 +109,22 @@ public class BuildFlow extends AbstractProject<BuildFlow, FlowRun> implements To
         public TopLevelItem newInstance(ItemGroup parent, String name) {
             return new BuildFlow(parent, name);
         }
+
+        public FormValidation doCheckDsl(@QueryParameter String value) {
+            // Require RUN_SCRIPTS permission, otherwise print a warning that no edits are possible
+            if (!Jenkins.getInstance().hasPermission(Jenkins.RUN_SCRIPTS)) { 
+                return FormValidation.warning(Messages.BuildFlow_InsufficientPermissions());
+            }
+            
+            try {
+            	new GroovyShell().parse(value);
+			} 
+			catch (MultipleCompilationErrorsException e) {
+				return FormValidation.error( e.getMessage());
+			} 
+            return FormValidation.ok();
+        }
+      
     }
 
     @Override
@@ -124,36 +132,4 @@ public class BuildFlow extends AbstractProject<BuildFlow, FlowRun> implements To
         return FlowRun.class;
     }
 
-    @Override
-    public boolean isFingerprintConfigured() {
-        return getPublishersList().get(Fingerprinter.class)!=null;
-    }
-
-    @Override
-    protected void buildDependencyGraph(DependencyGraph graph) {
-        /* XXX: Examine the build flow to determine all possible downstream projects. */
-        publishers.buildDependencyGraph(this, graph);
-    }
-
-    @Override
-    protected Set<ResourceActivity> getResourceActivities() {
-        final Set<ResourceActivity> activities = new HashSet<ResourceActivity>();
-
-        activities.addAll(super.getResourceActivities());
-        activities.addAll(Util.filter(publishers,ResourceActivity.class));
-        return activities;
-    }
-
-    protected List<Action> createTransientActions() {
-        List<Action> r = super.createTransientActions();
-
-        for(BuildStep p : getPublishersList())
-            r.addAll(p.getProjectActions(this));
-
-        return r;
-    }
-
-    public AbstractProject<?, ?> asProject() {
-      return this;
-    } 
 }

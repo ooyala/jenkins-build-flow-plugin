@@ -2,6 +2,7 @@
  * The MIT License
  *
  * Copyright (c) 2013, CloudBees, Inc., Nicolas De Loof.
+ *                     Cisco Systems, Inc., a California corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,43 +22,34 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-
 package com.cloudbees.plugins.flow;
 
-import hudson.model.BuildBadgeAction;
 
-import hudson.model.Action;
+import jenkins.model.CauseOfInterruption;
+import jenkins.model.Jenkins;
 
-/**
- * @author <a href="mailto:nicolas.deloof@cloudbees.com">Nicolas De loof</a>
- */
-public class BuildFlowAction implements BuildBadgeAction {
+public class FlowAbortedCause extends CauseOfInterruption {
 
-    private final FlowRun flow;
-    
-    public BuildFlowAction(FlowRun flow) {
-        this.flow = flow;
-    }
+	/** The BuildFlow project that caused the abort */
+	private final String project;
+	/** The build number of the project that caused the abort. */
+	private final int build;
 
-    public FlowRun getFlow() {
-        return flow;
-    }
-    
-    public String getTooltip() {
-        //FIXME use bundle
-        return "This build was triggered by a flow";
-    }
+	public FlowAbortedCause(FlowRun flowRun) {
+		this.project = flowRun.getParent().getFullName();
+		this.build = flowRun.getNumber();
+	}
 
-    public String getIconFileName() {
-        return "/plugin/build-flow-plugin/images/16x16/flow.png";
-    }
+	public String getAbortedBuildFlow() {
+		return project;
+	}
 
-    public String getDisplayName() {
-        return Messages.BuildFlowAction_Messages();
-    }
+	public int getAbortedBuildNumber() {
+		return build;
+	}
 
-    public String getUrlName() {
-        //FIXME flow is not persisted so it is null when reloading action from previous build
-        return flow.getBuildFlow().getAbsoluteUrl();
-    }
+	@Override
+	public String getShortDescription() {
+		return "Job aborted as " + project + "#" + build +" was aborted.";
+	}
 }

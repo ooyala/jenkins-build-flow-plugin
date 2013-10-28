@@ -1,18 +1,25 @@
 /*
- * Copyright (C) 2011 CloudBees Inc.
+ * The MIT License
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * as published by the Free Software Foundation; either version 3
- * of the License, or (at your option) any later version.
+ * Copyright (c) 2013, CloudBees, Inc., Nicolas De Loof.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * You should have received a copy of the GNU Lesser General Public
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 package com.cloudbees.plugins.flow
@@ -35,7 +42,7 @@ class ParallelTest extends DSLTestCase {
         """)
         assertAllSuccess(jobs)
         assert SUCCESS == flow.result
-        println flow.builds.edgeSet()
+        println flow.jobsGraph.edgeSet()
     }
 
     public void testFailOnParallelFailed() {
@@ -52,7 +59,7 @@ class ParallelTest extends DSLTestCase {
         """)
         assertDidNotRun(job4)
         assert FAILURE == flow.result
-        println flow.builds.edgeSet()
+        println flow.jobsGraph.edgeSet()
     }
 
 
@@ -76,7 +83,7 @@ class ParallelTest extends DSLTestCase {
         assertDidNotRun(job4)
         assertAllSuccess(jobs)
         assert FAILURE == flow.result
-        println flow.builds.edgeSet()
+        println flow.jobsGraph.edgeSet()
     }
 
     public void testGetParallelResults() {
@@ -97,7 +104,28 @@ class ParallelTest extends DSLTestCase {
         assertHasParameter(job4, "r1", "SUCCESS")
         assertHasParameter(job4, "r2", "job2")
         assert SUCCESS == flow.result
-        println flow.builds.edgeSet()
+        println flow.jobsGraph.edgeSet()
+    }
+
+    public void testParallelMap() {
+        def jobs = createJobs(["job1", "job2", "job3"])
+        def job4 = createJob("job4")
+        def flow = run("""
+            join = parallel ([
+                first:  { build("job1") },
+                second: { build("job2") },
+                third:  { build("job3") }
+            ])
+            build("job4",
+                   r1: join.first.result.name,
+                   r2: join.second.lastBuild.parent.name)
+        """)
+        assertAllSuccess(jobs)
+        assertSuccess(job4)
+        assertHasParameter(job4, "r1", "SUCCESS")
+        assertHasParameter(job4, "r2", "job2")
+        assert SUCCESS == flow.result
+        println flow.jobsGraph.edgeSet()
     }
 
     public void testAcceptsList() {
@@ -110,18 +138,6 @@ class ParallelTest extends DSLTestCase {
         """)
         assertAllSuccess(jobs)
         assert SUCCESS == flow.result
-        println flow.builds.edgeSet()
-    }
-
-    public void testAcceptsMixClosuresAndLists() {
-        def jobs = createJobs(["job1", "job2", "job3"])
-        def flow = run("""
-            def v = [{ build("job1") },
-                      { build("job2") }]
-            parallel(v, { build("job3") })
-        """)
-        assertAllSuccess(jobs)
-        assert SUCCESS == flow.result
-        println flow.builds.edgeSet()
+        println flow.jobsGraph.edgeSet()
     }
 }

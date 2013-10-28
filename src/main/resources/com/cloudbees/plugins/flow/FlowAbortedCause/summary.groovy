@@ -1,7 +1,7 @@
 /*
  * The MIT License
  *
- * Copyright (c) 2013, CloudBees, Inc., Nicolas De Loof.
+ * Copyright (c) 2013, Cisco Systems, Inc., a California corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,43 +21,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+package com.cloudbees.plugins.flow.FlowAbortedCause
 
-package com.cloudbees.plugins.flow;
+def proj = app.getItemByFullName(my.abortedBuildFlow);
+def build = proj == null ? null : proj.getBuildByNumber(my.abortedBuildNumber);
 
-import hudson.model.BuildBadgeAction;
-
-import hudson.model.Action;
-
-/**
- * @author <a href="mailto:nicolas.deloof@cloudbees.com">Nicolas De loof</a>
- */
-public class BuildFlowAction implements BuildBadgeAction {
-
-    private final FlowRun flow;
-    
-    public BuildFlowAction(FlowRun flow) {
-        this.flow = flow;
-    }
-
-    public FlowRun getFlow() {
-        return flow;
-    }
-    
-    public String getTooltip() {
-        //FIXME use bundle
-        return "This build was triggered by a flow";
-    }
-
-    public String getIconFileName() {
-        return "/plugin/build-flow-plugin/images/16x16/flow.png";
-    }
-
-    public String getDisplayName() {
-        return Messages.BuildFlowAction_Messages();
-    }
-
-    public String getUrlName() {
-        //FIXME flow is not persisted so it is null when reloading action from previous build
-        return flow.getBuildFlow().getAbsoluteUrl();
-    }
+if (build != null) {
+  return raw(_("message", rootURL, proj.url, my.abortedBuildFlow, my.abortedBuildNumber ))
 }
+if (proj != null) {
+	return raw(_("message_no_build", rootURL, proj.url, my.abortedBuildFlow, my.abortedBuildNumber ))
+}
+return raw(_("message_no_job", rootURL, null, my.abortedBuildFlow, my.abortedBuildNumber ))

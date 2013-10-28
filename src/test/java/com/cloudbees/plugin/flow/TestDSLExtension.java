@@ -22,42 +22,25 @@
  * THE SOFTWARE.
  */
 
-package com.cloudbees.plugins.flow;
+package com.cloudbees.plugin.flow;
 
-import hudson.model.BuildBadgeAction;
+import com.cloudbees.plugins.flow.BuildFlowDSLExtension;
+import com.cloudbees.plugins.flow.FlowDelegate;
+import hudson.Extension;
 
-import hudson.model.Action;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
- * @author <a href="mailto:nicolas.deloof@cloudbees.com">Nicolas De loof</a>
+ * @author Kohsuke Kawaguchi
  */
-public class BuildFlowAction implements BuildBadgeAction {
-
-    private final FlowRun flow;
-    
-    public BuildFlowAction(FlowRun flow) {
-        this.flow = flow;
-    }
-
-    public FlowRun getFlow() {
-        return flow;
-    }
-    
-    public String getTooltip() {
-        //FIXME use bundle
-        return "This build was triggered by a flow";
-    }
-
-    public String getIconFileName() {
-        return "/plugin/build-flow-plugin/images/16x16/flow.png";
-    }
-
-    public String getDisplayName() {
-        return Messages.BuildFlowAction_Messages();
-    }
-
-    public String getUrlName() {
-        //FIXME flow is not persisted so it is null when reloading action from previous build
-        return flow.getBuildFlow().getAbsoluteUrl();
+@Extension
+public class TestDSLExtension extends BuildFlowDSLExtension {
+    @Override
+    public Object createExtension(String extensionName, FlowDelegate dsl) {
+        Map m = new TreeMap();
+        m.put("dsl",dsl);
+        m.put("name",extensionName);
+        return m;
     }
 }

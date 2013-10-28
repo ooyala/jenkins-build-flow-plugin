@@ -1,28 +1,42 @@
 /*
- * Copyright (C) 2011 CloudBees Inc.
+ * The MIT License
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * as published by the Free Software Foundation; either version 3
- * of the License, or (at your option) any later version.
+ * Copyright (c) 2013, CloudBees, Inc., Nicolas De Loof.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * You should have received a copy of the GNU Lesser General Public
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 package com.cloudbees.plugins.flow;
 
-import hudson.model.*;
+import static hudson.model.Result.FAILURE;
+import static hudson.model.Result.SUCCESS;
+import hudson.model.Action;
+import hudson.model.Build;
+import hudson.model.BuildListener;
+import hudson.model.Result;
+import hudson.model.Run;
 
-import java.io.*;
-import java.net.URLEncoder;
-import java.util.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 import org.jgrapht.DirectedGraph;
@@ -31,62 +45,65 @@ import org.jgrapht.graph.SimpleDirectedGraph;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 
-import static hudson.model.Result.FAILURE;
-import static hudson.model.Result.SUCCESS;
-
 /**
  * Maintain the state of execution of a build flow as a chain of triggered jobs
  *
  * @author <a href="mailto:nicolas.deloof@cloudbees.com">Nicolas De loof</a>
  */
-public class FlowRun extends AbstractBuild<BuildFlow, FlowRun>{
+public class FlowRun extends Build<BuildFlow, FlowRun> {
 
     private static final Logger LOGGER = Logger.getLogger(FlowRun.class.getName());
     
-	private String dsl;
+    private String dsl;
 
-    private DirectedGraph<Run, String> builds = new SimpleDirectedGraph<Run, String>(String.class);
+    private JobInvocation.Start startJob;
+
+    private DirectedGraph<JobInvocation, JobEdge> jobsGraph;
 
     private transient ThreadLocal<FlowState> state = new ThreadLocal<FlowState>();
-
-    private transient Set<JobInvocation> lastCompleted;
+    
+    private transient AtomicInteger buildIndex = new AtomicInteger(1);
 
     public FlowRun(BuildFlow job, File buildDir) throws IOException {
         super(job, buildDir);
-        this.dsl = job.getDsl();
-        builds.addVertex(this); // Initial vertex for the build DAG
-        state.set(new FlowState(SUCCESS, this));
+        setup(job);
     }
 
     public FlowRun(BuildFlow job) throws IOException {
         super(job);
-        this.dsl = job.getDsl();
-        builds.addVertex(this); // Initial vertex for the build DAG
-        state.set(new FlowState(SUCCESS, this));
+        setup(job);
     }
 
     public FlowRun(Immunity job) throws IOException {
         super(job);
-        this.dsl = job.getDsl();
-        builds.addVertex(this); // Initial vertex for the build DAG
-        state.set(new FlowState(SUCCESS, this));
+        setup(job);
     }
 
     public FlowRun(Immunity job, File buildDir) throws IOException {
         super(job, buildDir);
-        this.dsl = job.getDsl();
-        builds.addVertex(this); // Initial vertex for the build DAG
-        state.set(new FlowState(SUCCESS, this));
+        setup(job);
     }
 
-    /* package */ Run run(JobInvocation job, List<Action> actions) throws ExecutionException, InterruptedException {
-        Boolean could_run = job.run(new FlowCause(this),actions);
+    private void setup(BuildFlow job) throws IOException {
+        if (jobsGraph == null) {
+            jobsGraph = new SimpleDirectedGraph<JobInvocation, JobEdge>(JobEdge.class);
+        }
+        if (startJob == null) {
+            startJob = new JobInvocation.Start(this);
+        }
+        this.dsl = job.getDsl();
+        startJob.buildStarted(this);
+        jobsGraph.addVertex(startJob);
+        state.set(new FlowState(SUCCESS, startJob));
+    }
 
-        if(!could_run)
-            throw new CouldNotScheduleJobException("Could not schedule job " 
-                    + job.getProject().getName() +", ensure its not already enqueued with same parameters");
+    /* package */ void schedule(JobInvocation job, List<Action> actions) throws ExecutionException, InterruptedException {
+        addBuild(job);
+        job.run(new FlowCause(this, job), actions);
+    }
 
-        addBuild(job.getBuild());
+    /* package */ Run waitForCompletion(JobInvocation job) throws ExecutionException, InterruptedException {
+        job.waitForCompletion();
         getState().setResult(job.getResult());
         return job.getBuild();
     }
@@ -99,12 +116,12 @@ public class FlowRun extends AbstractBuild<BuildFlow, FlowRun>{
         state.set(s);
     }
 
-    private void setLastCompleted(JobInvocation job) {
-        lastCompleted = Collections.singleton(job);
+    public DirectedGraph<JobInvocation, JobEdge> getJobsGraph() {
+        return jobsGraph;
     }
 
-    public DirectedGraph<Run, String> getBuilds() {
-        return builds;
+    public JobInvocation getStartJob() {
+        return startJob;
     }
 
     public BuildFlow getBuildFlow() {
@@ -112,30 +129,25 @@ public class FlowRun extends AbstractBuild<BuildFlow, FlowRun>{
     }
 
     public void doGetDot(StaplerRequest req, StaplerResponse rsp) throws IOException {
-        new DOTExporter().export(rsp.getWriter(), builds);
+        new DOTExporter().export(rsp.getWriter(), jobsGraph);
     }
 
-
-    public synchronized void addBuild(Run build) throws ExecutionException, InterruptedException {
-        builds.addVertex(build);
-        for (Run up : state.get().getLastCompleted()) {
-            String edge = up.toString() + " => " + build.toString();
+    public synchronized void addBuild(JobInvocation job) throws ExecutionException, InterruptedException {
+        jobsGraph.addVertex(job);
+        for (JobInvocation up : state.get().getLastCompleted()) {
+            String edge = up.getId() + " => " + job.getId();
             LOGGER.fine("added build to execution graph " + edge);
-            builds.addEdge(up, build, edge);
+            jobsGraph.addEdge(up, job, new JobEdge(up, job));
         }
-        state.get().setLastCompleted(build);
+        state.get().setLastCompleted(job);
     }
 
     @Override
     public void run() {
-        run(createRunner());        
+        execute(new RunnerImpl(dsl));
     }
     
-    protected Runner createRunner() {
-        return new RunnerImpl(dsl);
-    }
-    
-    protected class RunnerImpl extends AbstractRunner {
+    protected class RunnerImpl extends RunExecution {
 
         private final String dsl;
 
@@ -143,40 +155,42 @@ public class FlowRun extends AbstractBuild<BuildFlow, FlowRun>{
             this.dsl = dsl;
         }
 
-        protected Result doRun(BuildListener listener) throws Exception {
-            if(!preBuild(listener, project.getPublishersList()))
-                return FAILURE;
-
-            try {
-                setResult(SUCCESS);
-                new FlowDSL().executeFlowScript(FlowRun.this, dsl, listener);
-            } finally {
-                boolean failed=false;
-                for( int i=buildEnvironments.size()-1; i>=0; i-- ) {
-                    if (!buildEnvironments.get(i).tearDown(FlowRun.this,listener)) {
-                        failed=true;
-                    }
-                }
-                if (failed) return Result.FAILURE;
-            }
+        @Override
+        public Result run(BuildListener listener) throws Exception, RunnerAbortedException {
+            setResult(SUCCESS);
+            new FlowDSL().executeFlowScript(FlowRun.this, dsl, listener);
             return getState().getResult();
         }
 
         @Override
-        public void post2(BuildListener listener) throws IOException, InterruptedException {
-            if(!performAllBuildSteps(listener, project.getPublishersList(), true))
-                setResult(FAILURE);
+        public void post(BuildListener listener) throws Exception {
+            FlowRun.this.startJob.buildCompleted();
         }
 
         @Override
         public void cleanUp(BuildListener listener) throws Exception {
-            performAllBuildSteps(listener, project.getPublishersList(), false);
-            super.cleanUp(listener);
+
         }
     }
-    
-    public String id(Run run) throws UnsupportedEncodingException {
-        return URLEncoder.encode(run.getParent().getFullDisplayName() + run.getNumber(), "UTF-8");
+
+    public static class JobEdge {
+
+        private JobInvocation source;
+        private JobInvocation target;
+
+        public JobEdge(JobInvocation source, JobInvocation target) {
+            this.source = source;
+            this.target = target;
+        }
+
+        public JobInvocation getSource() {
+            return source;
+        }
+
+        public JobInvocation getTarget() {
+            return target;
+        }
+
     }
 
 }

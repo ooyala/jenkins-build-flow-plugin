@@ -24,55 +24,45 @@
 
 package com.cloudbees.plugins.flow;
 
-import hudson.model.Result;
+import hudson.Extension;
+import hudson.model.Run;
+import org.jenkinsci.plugins.buildgraphview.DownStreamRunDeclarer;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 /**
- * @author: <a hef="mailto:nicolas.deloof@gmail.com">Nicolas De Loof</a>
+ * @author <a href="mailto:nicolas.deloof@gmail.com">Nicolas De Loof</a>
  */
-public class FlowState {
+@Extension
+public class FlowDownStreamRunDeclarer extends DownStreamRunDeclarer {
 
-    private Result result;
+    @Override
+    public List<Run> getDownStream(Run r) throws ExecutionException, InterruptedException {
 
-    private Set<JobInvocation> lastCompleted;
+        if (r instanceof FlowRun) {
+            FlowRun f = (FlowRun) r;
+            return getOutgoingEdgeRuns(f, f.getStartJob());
+        }
 
-    public FlowState(Result result, Set<JobInvocation> previous) {
-        assert result != null;
-        this.result = result;
-        setLastCompleted(previous);
+        FlowCause flow = (FlowCause) r.getCause(FlowCause.class);
+        if (flow != null) {
+            FlowRun f = flow.getFlowRun();
+            return getOutgoingEdgeRuns(f, flow.getAssociatedJob());
+        }
+
+        return Collections.emptyList();
     }
 
-    public FlowState(Result result, JobInvocation previous) {
-        assert result != null;
-        this.result = result;
-        setLastCompleted(previous);
+    private List<Run> getOutgoingEdgeRuns(FlowRun f, JobInvocation start) throws ExecutionException, InterruptedException {
+        Set<FlowRun.JobEdge> edges = f.getJobsGraph().outgoingEdgesOf(start);
+        List<Run> runs = new ArrayList<Run>(edges.size());
+        for (FlowRun.JobEdge edge : edges) {
+            runs.add(edge.getTarget().getBuild());
+        }
+        return runs;
     }
-
-    public Result getResult() {
-        return result;
-    }
-
-    public void setResult(Result result) {
-        assert result != null;
-        this.result = result;
-    }
-
-    public Set<JobInvocation> getLastCompleted() {
-        return lastCompleted;
-    }
-
-    public void setLastCompleted(JobInvocation lastCompleted) {
-        this.lastCompleted = Collections.singleton(lastCompleted);
-    }
-
-    public void setLastCompleted(Set<JobInvocation> lastCompleted) {
-        this.lastCompleted = lastCompleted;
-    }
-
-    public JobInvocation getLastBuild() {
-        return this.lastCompleted.iterator().next();
-    }
-
 }

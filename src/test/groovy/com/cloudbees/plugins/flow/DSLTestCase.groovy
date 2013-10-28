@@ -1,22 +1,31 @@
 /*
- * Copyright (C) 2011 CloudBees Inc.
+ * The MIT License
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * as published by the Free Software Foundation; either version 3
- * of the License, or (at your option) any later version.
+ * Copyright (c) 2013, CloudBees, Inc., Nicolas De Loof.
+ *                     Cisco Systems, Inc., a California corporation
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * You should have received a copy of the GNU Lesser General Public
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 package com.cloudbees.plugins.flow
 
+import com.cloudbees.plugin.flow.UnstableBuilder
 import com.cloudbees.plugins.flow.FlowDSL
 import hudson.model.Result
 import org.jvnet.hudson.test.FailureBuilder
@@ -39,7 +48,10 @@ import hudson.Launcher
 import hudson.model.BuildListener
 import hudson.tasks.Builder
 import com.cloudbees.plugin.flow.ConfigurableFailureBuilder
+import com.cloudbees.plugin.flow.BlockingBuilder
 import hudson.model.Job
+
+import static hudson.model.Result.UNSTABLE
 
 abstract class DSLTestCase extends HudsonTestCase {
 
@@ -61,10 +73,28 @@ abstract class DSLTestCase extends HudsonTestCase {
         return job
     }
 
+    def createUnstableJob = {String name ->
+        def job = createJob(name)
+        job.getBuildersList().add(new UnstableBuilder());
+        return job
+    }
+
+    def createBlockingJob = {String name, File file = BlockingBuilder.DEFAULT_FILE ->
+        def job = createJob(name)
+        job.getBuildersList().add(new BlockingBuilder(file));
+        return job
+    }
+
     def run = { script ->
         BuildFlow flow = new BuildFlow(Jenkins.instance, getName())
         flow.dsl = script
         return flow.scheduleBuild2(0).get()
+    }
+
+    def schedule = { script ->
+        BuildFlow flow = new BuildFlow(Jenkins.instance, getName())
+        flow.dsl = script
+        return flow.scheduleBuild2(0)
     }
 
     def runWithCause = { script, cause ->
@@ -74,7 +104,7 @@ abstract class DSLTestCase extends HudsonTestCase {
     }
 
     def assertSuccess = { job ->
-        assert null != job.builds.lastBuild;
+        assertNotNull("job ${job.name} didn't run", job.builds.lastBuild)
         assert SUCCESS == job.builds.lastBuild.result
         return job.builds.lastBuild
     }
@@ -85,13 +115,17 @@ abstract class DSLTestCase extends HudsonTestCase {
 
     def assertAllSuccess = { jobs ->
         jobs.each {
-            assert null != it.builds.lastBuild;
+            assertNotNull("job ${it.name} didn't run", it.builds.lastBuild)
             assert SUCCESS == it.builds.lastBuild.result
         }
     }
 
     def assertFailure = { job ->
         assert FAILURE == job.builds.lastBuild.result
+    }
+
+    def assertUnstable = { job ->
+        assert UNSTABLE == job.builds.lastBuild.result
     }
 
     def assertException(Class<? extends Exception> exClass, Closure closure) {

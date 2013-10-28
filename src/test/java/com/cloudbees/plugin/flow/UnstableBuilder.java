@@ -22,42 +22,35 @@
  * THE SOFTWARE.
  */
 
-package com.cloudbees.plugins.flow;
+package com.cloudbees.plugin.flow;
 
-import hudson.model.BuildBadgeAction;
+import hudson.Extension;
+import hudson.Launcher;
+import hudson.model.AbstractBuild;
+import hudson.model.BuildListener;
+import hudson.model.Descriptor;
+import hudson.tasks.Builder;
+import net.sf.json.JSONObject;
+import org.kohsuke.stapler.StaplerRequest;
 
-import hudson.model.Action;
+import static hudson.model.Result.FAILURE;
+import static hudson.model.Result.SUCCESS;
+import static hudson.model.Result.UNSTABLE;
 
 /**
- * @author <a href="mailto:nicolas.deloof@cloudbees.com">Nicolas De loof</a>
+ * @author: <a hef="mailto:nicolas.deloof@gmail.com">Nicolas De Loof</a>
  */
-public class BuildFlowAction implements BuildBadgeAction {
+public class UnstableBuilder extends Builder {
 
-    private final FlowRun flow;
-    
-    public BuildFlowAction(FlowRun flow) {
-        this.flow = flow;
+    public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) {
+        build.setResult(UNSTABLE);
+        return true;
     }
 
-    public FlowRun getFlow() {
-        return flow;
-    }
-    
-    public String getTooltip() {
-        //FIXME use bundle
-        return "This build was triggered by a flow";
-    }
-
-    public String getIconFileName() {
-        return "/plugin/build-flow-plugin/images/16x16/flow.png";
-    }
-
-    public String getDisplayName() {
-        return Messages.BuildFlowAction_Messages();
-    }
-
-    public String getUrlName() {
-        //FIXME flow is not persisted so it is null when reloading action from previous build
-        return flow.getBuildFlow().getAbsoluteUrl();
+    @Extension
+    public static final class DescriptorImpl extends Descriptor<Builder> {
+        public String getDisplayName() {
+            return "Set Unstable";
+        }
     }
 }

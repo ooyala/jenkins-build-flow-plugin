@@ -22,42 +22,24 @@
  * THE SOFTWARE.
  */
 
-package com.cloudbees.plugins.flow;
+package com.cloudbees.plugins.flow
 
-import hudson.model.BuildBadgeAction;
+import com.cloudbees.plugin.flow.TestDSLExtension
+import hudson.model.Result
 
-import hudson.model.Action;
+class BuildFlowDSLExtensionTest extends DSLTestCase {
 
-/**
- * @author <a href="mailto:nicolas.deloof@cloudbees.com">Nicolas De loof</a>
- */
-public class BuildFlowAction implements BuildBadgeAction {
-
-    private final FlowRun flow;
-    
-    public BuildFlowAction(FlowRun flow) {
-        this.flow = flow;
+    public void testUseExtension() {
+        BuildFlowDSLExtension.all().add(new TestDSLExtension())
+        def flow = run("""
+            x = extension.test123
+            println "name="+x.name
+            println "dsl="+x.dsl.class.name
+        """)
+        System.out.println flow.log
+        assert Result.SUCCESS == flow.result
+        assert flow.log.contains("name=test123")
+        assert flow.log.contains("dsl="+FlowDelegate.class.name)
     }
 
-    public FlowRun getFlow() {
-        return flow;
-    }
-    
-    public String getTooltip() {
-        //FIXME use bundle
-        return "This build was triggered by a flow";
-    }
-
-    public String getIconFileName() {
-        return "/plugin/build-flow-plugin/images/16x16/flow.png";
-    }
-
-    public String getDisplayName() {
-        return Messages.BuildFlowAction_Messages();
-    }
-
-    public String getUrlName() {
-        //FIXME flow is not persisted so it is null when reloading action from previous build
-        return flow.getBuildFlow().getAbsoluteUrl();
-    }
 }

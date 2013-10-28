@@ -24,40 +24,38 @@
 
 package com.cloudbees.plugins.flow;
 
-import hudson.model.BuildBadgeAction;
+import java.util.List;
 
-import hudson.model.Action;
+import hudson.Extension;
+import hudson.model.TaskListener;
+import hudson.model.AbstractBuild;
+import hudson.model.Cause;
+import hudson.model.listeners.RunListener;
 
-/**
- * @author <a href="mailto:nicolas.deloof@cloudbees.com">Nicolas De loof</a>
- */
-public class BuildFlowAction implements BuildBadgeAction {
+@Extension
+public class FlowListener extends RunListener<AbstractBuild<?, ?>> {
 
-    private final FlowRun flow;
-    
-    public BuildFlowAction(FlowRun flow) {
-        this.flow = flow;
+    @Override
+    public synchronized void onStarted(AbstractBuild<?, ?> startedBuild,
+            TaskListener listener) {
+        List<Cause> causes = startedBuild.getCauses();
+        for (Cause cause : causes) {
+            if (cause instanceof FlowCause) {
+                ((FlowCause) cause).getAssociatedJob().buildStarted(
+                        startedBuild);
+            }
+        }
     }
 
-    public FlowRun getFlow() {
-        return flow;
-    }
-    
-    public String getTooltip() {
-        //FIXME use bundle
-        return "This build was triggered by a flow";
-    }
-
-    public String getIconFileName() {
-        return "/plugin/build-flow-plugin/images/16x16/flow.png";
+    @Override
+    public synchronized void onCompleted(AbstractBuild<?, ?> finishedBuild,
+            TaskListener listener) {
+        List<Cause> causes = finishedBuild.getCauses();
+        for (Cause cause : causes) {
+            if (cause instanceof FlowCause) {
+                ((FlowCause) cause).getAssociatedJob().buildCompleted();
+            }
+        }
     }
 
-    public String getDisplayName() {
-        return Messages.BuildFlowAction_Messages();
-    }
-
-    public String getUrlName() {
-        //FIXME flow is not persisted so it is null when reloading action from previous build
-        return flow.getBuildFlow().getAbsoluteUrl();
-    }
 }
