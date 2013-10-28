@@ -90,7 +90,6 @@ public class FlowDSL {
             dslScript.run()
         } catch(JobExecutionFailureException e) {
             listener.println("flow failed to complete : " + flowRun.state.result)
-            // flowRun.state.result = FAILURE;
         } catch (AbortException e) {
             // aborted should not cause any logging.
             killRunningJobs(flowRun, listener)
@@ -241,17 +240,12 @@ public class FlowDelegate {
 
     /* Additional parameters overload defaults with the same name.
      */
-    def build(Map in_args, String jobName) {
+    def build(Map args, String jobName) {
         statusCheck()
         // ask for job with name ${name}
         JobInvocation job = new JobInvocation(flowRun, jobName)
         Job p = job.getProject()
         println("Schedule job " + HyperlinkNote.encodeTo('/'+ p.getUrl(), p.getFullDisplayName()))
-
-        // Start with the default arguments then add all the arguments provided to build.
-        // This means that parameters provided to build will override default parameters.
-        def args = getDefaultParams(p)
-        args.putAll(in_args)
 
         flowRun.schedule(job, getActions(p,args));
         Run r = job.waitForStart()
@@ -271,30 +265,6 @@ public class FlowDelegate {
     def buildOn(Map in_args, String labelExpr, String jobName) {
         in_args.put("anonymous_label", new NodeConstraintParam(labelExpr))
         build(in_args, jobName)
-    }
-
-    def getDefaultParams(AbstractProject project) {
-        Map out = new HashMap()
-
-        // There is a private method of project called getDefaultParameters that could simplify all this.
-        ParametersDefinitionProperty projectParams = project.getProperty(ParametersDefinitionProperty.class)
-        if(null == projectParams)
-            return out
-
-        for(ParameterDefinition parameterDefinition : projectParams.getParameterDefinitions()) {
-            ParameterValue defaultValue = parameterDefinition.getDefaultParameterValue()
-            if(null == defaultValue)
-                continue
-
-            if (defaultValue instanceof BooleanParameterValue) {
-                out.put(parameterDefinition.getName(), ((BooleanParameterValue)defaultValue).value)
-            }
-            if (defaultValue instanceof  StringParameterValue) {
-                out.put(parameterDefinition.getName(), ((StringParameterValue)defaultValue).value)
-            }
-        }
-
-        return out
     }
 
     def getActions(Job job, Map args) {
